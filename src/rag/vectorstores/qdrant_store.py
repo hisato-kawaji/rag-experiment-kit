@@ -55,15 +55,15 @@ class QdrantStore:
         where: dict[str, Any] | None = None,
     ) -> list[RetrievedChunk]:
         flt = self._make_filter(where) if where else None
-        hits = self._client.search(
+        response = self._client.query_points(
             collection_name=self.collection,
-            query_vector=vector,
+            query=vector,
             limit=k,
             query_filter=flt,
             with_payload=True,
         )
         out: list[RetrievedChunk] = []
-        for h in hits:
+        for h in response.points:
             payload = dict(h.payload or {})
             text = payload.pop("text", "")
             chunk = Chunk(
