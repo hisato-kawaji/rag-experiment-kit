@@ -1,0 +1,71 @@
+[project]
+name = "rag"
+version = "0.1.0"
+description = "RAG research/dev environment — paper-driven, multi-VDB, self-built techniques"
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+  "typer>=0.12",
+  "rich>=13.7",
+  "hydra-core>=1.3",
+  "omegaconf>=2.3",
+  "python-dotenv>=1.0",
+  "tqdm>=4.66",
+  "tenacity>=9.0",
+  "structlog>=24.4",
+  "ollama>=0.3.3",
+  "openai>=1.40",
+  "httpx>=0.27",
+  "trafilatura>=1.12",
+  "wikipedia-api>=0.6",
+  "beautifulsoup4>=4.12",
+  "qdrant-client>=1.11",
+  "networkx>=3.3",
+  "python-igraph>=0.11",
+  "leidenalg>=0.10",
+  "llama-index-core>=0.11",
+  "llama-index-llms-ollama>=0.3",
+  "llama-index-embeddings-ollama>=0.3",
+  "llama-index-vector-stores-qdrant>=0.3",
+  "ragas>=0.2",
+  "datasets>=3.0",
+  "langchain-community>=0.3",
+  "langchain-ollama>=0.2",
+  "streamlit>=1.39",
+  "plotly>=5.24",
+  "pyyaml>=6.0",
+  "pandas>=2.2",
+]
+
+[project.optional-dependencies]
+docling   = ["docling>=2.0"]
+phoenix   = ["arize-phoenix>=5.0", "openinference-instrumentation-llama-index>=3.0"]
+neo4j     = ["neo4j>=5.24"]
+notebooks = ["jupytext>=1.16", "ipykernel>=6.29", "jupyterlab>=4.2"]
+dev       = ["ruff>=0.6", "pytest>=8.3", "pytest-asyncio>=0.24", "mypy>=1.11"]
+
+[project.scripts]
+rag = "rag.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rag"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

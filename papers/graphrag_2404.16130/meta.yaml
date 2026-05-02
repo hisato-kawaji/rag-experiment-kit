@@ -1,0 +1,38 @@
+arxiv_id: "2404.16130"
+title: "From Local to Global: A Graph RAG Approach to Query-Focused Summarization"
+authors:
+  - Darren Edge
+  - Ha Trinh
+  - Newman Cheng
+  - Joshua Bradley
+  - Alex Chao
+  - Apurva Mody
+  - Steven Truitt
+  - Dasha Metropolitansky
+  - Robert Osazuwa Ness
+  - Jonathan Larson
+year: 2024
+url: https://arxiv.org/abs/2404.16130
+pdf: paper.pdf
+
+status: implemented
+implementation_module: rag.techniques.graphrag
+implementation_path: src/rag/techniques/graphrag/
+config: configs/pipelines/graphrag.yaml
+
+key_ideas:
+  - "Two-stage indexing: (1) LLM extracts entities + relations from chunks, (2) LLM summarizes each community of the resulting graph."
+  - "Hierarchical Leiden community detection — different levels = different abstraction granularity."
+  - "Global query = map-reduce over community summaries (good for sense-making questions)."
+  - "Local query = entity-anchored neighborhood + supporting chunks (good for factoid questions)."
+
+phase1_simplifications:
+  - "Single-pass entity extraction (no 'gleaning' multi-pass loop yet)."
+  - "Local-search entity matching uses substring/token heuristic, not a dedicated entity vector index."
+  - "Community ranking uses LLM self-rated helpfulness (0-100), not a separately trained scorer."
+
+phase2_followups:
+  - "Add gleaning loop for higher extraction recall."
+  - "Build a dedicated entity vector index (separate Qdrant collection) for robust local-search anchoring."
+  - "Persist graph to Neo4j for browser-based exploration."
+  - "Per-level community evaluation — measure when global vs local is preferable."

@@ -1,0 +1,94 @@
+version: '3'
+
+dotenv: ['.env']
+
+vars:
+  PY: uv run python
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  # ---------- bootstrap ----------
+  install:
+    desc: Sync uv venv with all extras needed for Phase 1
+    cmds:
+      - uv sync --extra dev --extra notebooks
+
+  setup:
+    desc: One-shot bootstrap — venv + docker (qdrant) + ollama models
+    cmds:
+      - task: install
+      - task: docker-up
+      - task: ollama-pull
+
+  docker-up:
+    desc: Start Qdrant
+    cmds: [docker compose up -d qdrant]
+
+  docker-up-all:
+    desc: Start qdrant + neo4j + phoenix
+    cmds: [docker compose --profile graph --profile trace up -d]
+
+  docker-down:
+    cmds: [docker compose down]
+
+  ollama-pull:
+    desc: Pull default Ollama models (LLM + embedding)
+    cmds:
+      - ollama pull $OLLAMA_MODEL_LLM
+      - ollama pull $OLLAMA_MODEL_EMBED
+
+  # ---------- core flow ----------
+  ingest:
+    desc: 'Ingest data. e.g. task ingest -- --source wikipedia --query "Artificial intelligence" --limit 20'
+    cmds: ['{{.PY}} -m rag.cli ingest {{.CLI_ARGS}}']
+
+  build-graph:
+    desc: 'Build GraphRAG index from ingested chunks. e.g. task build-graph'
+    cmds: ['{{.PY}} -m rag.cli build-graph {{.CLI_ARGS}}']
+
+  synth-eval:
+    desc: 'Generate synthetic QA eval set. e.g. task synth-eval -- --n 30'
+    cmds: ['{{.PY}} -m rag.cli synth-eval {{.CLI_ARGS}}']
+
+  run:
+    desc: 'Run pipeline against eval set. e.g. task run -- --pipeline graphrag'
+    cmds: ['{{.PY}} -m rag.cli run {{.CLI_ARGS}}']
+
+  compare:
+    desc: Compare baseline vs graphrag on the eval set
+    cmds: ['{{.PY}} -m rag.cli compare {{.CLI_ARGS}}']
+
+  query:
+    desc: 'One-off query. e.g. task query -- --pipeline graphrag --q "your question"'
+    cmds: ['{{.PY}} -m rag.cli query {{.CLI_ARGS}}']
+
+  ui:
+    desc: Launch Streamlit inspection UI
+    cmds: [uv run streamlit run ui/app.py]
+
+  notebook:
+    desc: Sync .py↔.ipynb and start JupyterLab in notebooks/
+    cmds:
+      - uv run jupytext --sync notebooks/*.py
+      - uv run jupyter lab notebooks/
+
+  new-paper:
+    desc: 'Scaffold a paper folder. e.g. task new-paper -- --id 2410.05229 --name hipporag'
+    cmds: ['{{.PY}} -m rag.cli new-paper {{.CLI_ARGS}}']
+
+  # ---------- quality ----------
+  test:
+    cmds: [uv run pytest]
+
+  lint:
+    cmds:
+      - uv run ruff check .
+      - uv run ruff format --check .
+
+  fmt:
+    cmds:
+      - uv run ruff format .
+      - uv run ruff check --fix .

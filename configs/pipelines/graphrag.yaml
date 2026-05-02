@@ -1,0 +1,4 @@
+name: graphrag
+mode: global         # "global" | "local"
+top_k: 5
+artifacts_dir: data/graphrag
