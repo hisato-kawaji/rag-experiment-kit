@@ -1,6 +1,9 @@
-# RAG dev env
+# rag-experiment-kit
 
 Paper-driven RAG research environment. One-command flows for ingestion, indexing, evaluation, and side-by-side technique comparison.
+
+📚 **Docs**: [Home](docs/Home.md) · [Roadmap](docs/Roadmap.md) · [Architecture](docs/Architecture.md) · [Working Principles](docs/Working-Principles.md) · [Adding a paper](docs/Adding-a-Paper.md)
+🗺️ **Plan**: [Phase 2 milestone](https://github.com/hisato-kawaji/rag-experiment-kit/milestone/1) · [Phase 3 milestone](https://github.com/hisato-kawaji/rag-experiment-kit/milestone/2) · [All issues](https://github.com/hisato-kawaji/rag-experiment-kit/issues)
 
 ## What's here (Phase 1)
 
