@@ -1,14 +1,15 @@
-"""Orchestrator: source.fetch() → chunk_text → embed → vectorstore.upsert."""
+"""Orchestrator: source.fetch() → chunk_text → (optional enrich) → embed → vectorstore.upsert."""
 
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
 from ..embedding import build_embedding
 from ..logging import log
-from ..types import Chunk
+from ..types import Chunk, Document
 from ..vectorstores import build_vectorstore
 from .chunking import chunk_text
 from .sources import build_source
@@ -33,7 +34,14 @@ def ingest(
     chunk_overlap: int = 100,
     embed_batch: int = 32,
     upsert_batch: int = 128,
+    enrich_chunk: Callable[[Document, str], str] | None = None,
 ) -> IngestStats:
+    """If `enrich_chunk` is given, it is called per chunk before embedding/storage.
+
+    Used by Contextual Retrieval (Anthropic 2024) to prepend a 1-2 sentence
+    document-aware context to each chunk so the embedded text becomes more
+    self-contained.
+    """
     src = build_source(source)
     embedder = build_embedding()
     vectorstore = build_vectorstore()
@@ -55,11 +63,12 @@ def ingest(
         n_docs += 1
         pieces = chunk_text(doc.text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         for i, piece in enumerate(pieces):
+            text = enrich_chunk(doc, piece) if enrich_chunk else piece
             pending.append(
                 Chunk(
-                    id=_chunk_id(doc.id, i, piece),
+                    id=_chunk_id(doc.id, i, text),
                     doc_id=doc.id,
-                    text=piece,
+                    text=text,
                     metadata={**doc.metadata, "chunk_index": i},
                 )
             )

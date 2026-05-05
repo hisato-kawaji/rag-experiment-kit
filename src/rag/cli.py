@@ -32,6 +32,11 @@ def cmd_ingest(
     chunk_size: int = typer.Option(800),
     chunk_overlap: int = typer.Option(100),
     reset: bool = typer.Option(False, "--reset", help="Drop collection first"),
+    chunker: str = typer.Option(
+        "default",
+        "--chunker",
+        help="default | contextual (Anthropic 2024). 'contextual' calls the LLM once per chunk.",
+    ),
 ) -> None:
     """Pull docs → chunk → embed → upsert into Qdrant."""
     from .data import ingest as _ingest
@@ -51,7 +56,22 @@ def cmd_ingest(
     else:
         raise typer.BadParameter(f"Unknown source: {source}")
 
-    stats = _ingest(source, kwargs, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    enrich_chunk = None
+    if chunker == "contextual":
+        from .techniques.contextual_retrieval import make_contextual_enricher
+
+        enrich_chunk = make_contextual_enricher()
+        console.print("[cyan]contextual chunker enabled[/cyan] (LLM call per chunk)")
+    elif chunker != "default":
+        raise typer.BadParameter(f"Unknown chunker: {chunker}")
+
+    stats = _ingest(
+        source,
+        kwargs,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        enrich_chunk=enrich_chunk,
+    )
     console.print(f"[green]ingested[/green] docs={stats.docs} chunks={stats.chunks}")
 
 
@@ -125,11 +145,20 @@ def cmd_compare(
     if not rows:
         console.print("[yellow]no runs found[/yellow]")
         return
-    table = Table("pipeline", "run_id", "n", "faithfulness", "answer_relevancy",
-                  "context_precision", "context_recall")
+    table = Table(
+        "pipeline",
+        "run_id",
+        "n",
+        "faithfulness",
+        "answer_relevancy",
+        "context_precision",
+        "context_recall",
+    )
     for r in rows:
         table.add_row(
-            r["pipeline"], r["run_id"], str(r["n"]),
+            r["pipeline"],
+            r["run_id"],
+            str(r["n"]),
             f"{r.get('faithfulness', float('nan')):.3f}",
             f"{r.get('answer_relevancy', float('nan')):.3f}",
             f"{r.get('context_precision', float('nan')):.3f}",
@@ -155,8 +184,7 @@ def cmd_query(
     console.rule("[bold cyan]Contexts")
     for i, ctx in enumerate(answer.contexts, 1):
         console.print(
-            f"[dim]{i}. score={ctx.score:.3f} doc={ctx.chunk.doc_id} "
-            f"chunk={ctx.chunk.id}[/dim]"
+            f"[dim]{i}. score={ctx.score:.3f} doc={ctx.chunk.doc_id} chunk={ctx.chunk.id}[/dim]"
         )
         console.print(ctx.chunk.text[:300] + ("…" if len(ctx.chunk.text) > 300 else ""))
         console.print()

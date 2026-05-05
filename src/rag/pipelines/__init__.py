@@ -14,6 +14,10 @@ def build_pipeline(name: str, **kwargs: Any) -> Pipeline:
         from ..techniques.graphrag.pipeline import GraphRAGPipeline
 
         return GraphRAGPipeline(**kwargs)
+    if name == "contextual_retrieval":
+        from ..techniques.contextual_retrieval import ContextualRetrievalPipeline
+
+        return ContextualRetrievalPipeline(**kwargs)
     raise ValueError(f"Unknown pipeline: {name!r}")
 
 

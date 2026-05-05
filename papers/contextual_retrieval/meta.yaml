@@ -1,0 +1,24 @@
+arxiv_id: ""
+title: "Introducing Contextual Retrieval"
+authors:
+  - Anthropic
+year: 2024
+url: https://www.anthropic.com/news/contextual-retrieval
+pdf: ""
+
+status: implemented
+implementation_module: rag.techniques.contextual_retrieval
+implementation_path: src/rag/techniques/contextual_retrieval/
+
+key_ideas:
+  - "Before embedding, prepend each chunk with a 1-2 sentence LLM-generated context that situates it inside the whole document."
+  - "Anthropic reports BM25 + dense + Contextual reduces failed retrievals by ~49% on their internal benchmarks."
+  - "Cheap relative to GraphRAG: one LLM call per chunk, and Anthropic prompt caching makes the document portion ~free."
+
+phase1_simplifications:
+  - "No prompt-caching wired in yet — every chunk re-sends the document. With Ollama as the default LLM there is no cache anyway; revisit when an Anthropic adapter lands."
+  - "No BM25 hybrid pairing yet (issue #12 will combine the contextual collection with BM25 once Hybrid Retrieval lands)."
+
+phase2_followups:
+  - "Switch the contextual chunker to use Anthropic prompt caching when ANTHROPIC_API_KEY is set, so the document block becomes a cache hit across all of its chunks."
+  - "Combine with #12 (BM25 + dense hybrid) — Anthropic's blog measures the biggest gain when both retrievers see the contextual chunks."
