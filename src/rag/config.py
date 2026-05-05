@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -39,3 +40,6 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
     openai_api_key: str = ""
+
+    ragas_judge_backend: Literal["ollama", "anthropic", "openai"] = "ollama"
+    ragas_judge_model: str = ""

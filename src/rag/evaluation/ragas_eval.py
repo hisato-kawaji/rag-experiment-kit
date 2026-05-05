@@ -16,10 +16,9 @@ def evaluate_ragas(
     s = settings or Settings()
     try:
         from datasets import Dataset
-        from langchain_ollama import ChatOllama, OllamaEmbeddings
+        from langchain_ollama import OllamaEmbeddings
         from ragas import evaluate
         from ragas.embeddings import LangchainEmbeddingsWrapper
-        from ragas.llms import LangchainLLMWrapper
         from ragas.metrics import Faithfulness, ResponseRelevancy
 
         extra_metrics = []
@@ -36,13 +35,19 @@ def evaluate_ragas(
         log.error("ragas.import-error", error=str(e))
         return {}
 
-    llm = LangchainLLMWrapper(
-        ChatOllama(
-            model=s.ollama_model_llm,
-            base_url=s.ollama_host,
-            temperature=0.0,
-        )
+    from .judge import build_judge_llm
+
+    try:
+        llm = build_judge_llm(s)
+    except (ImportError, ValueError) as e:
+        log.error("ragas.judge.build-failed", backend=s.ragas_judge_backend, error=str(e))
+        return {}
+    log.info(
+        "ragas.judge",
+        backend=s.ragas_judge_backend,
+        model=s.ragas_judge_model or "<default>",
     )
+
     emb = LangchainEmbeddingsWrapper(
         OllamaEmbeddings(model=s.ollama_model_embed, base_url=s.ollama_host)
     )

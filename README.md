@@ -47,6 +47,35 @@ One-off query:
 task query -- --pipeline graphrag --q "What are the main approaches to quantum error correction?"
 ```
 
+## Switching the Ragas judge LLM
+
+Generation pipelines always use `OLLAMA_MODEL_LLM`. The Ragas **judge** (the
+LLM that scores faithfulness / context precision / etc.) can be swapped
+independently — useful when llama3.1:8b times out on judge prompts and metrics
+come back as `NaN`.
+
+```bash
+# Anthropic (recommended for stable faithfulness):
+uv sync --extra judge-anthropic
+# .env:
+#   RAGAS_JUDGE_BACKEND=anthropic
+#   ANTHROPIC_API_KEY=sk-ant-...
+#   RAGAS_JUDGE_MODEL=claude-haiku-4-5-20251001   # optional; empty -> default
+
+# OpenAI:
+uv sync --extra judge-openai
+# .env:
+#   RAGAS_JUDGE_BACKEND=openai
+#   OPENAI_API_KEY=sk-...
+#   RAGAS_JUDGE_MODEL=gpt-4o-mini
+
+# Back to Ollama (default):
+#   RAGAS_JUDGE_BACKEND=ollama
+```
+
+`task run -- --pipeline baseline` reads `RAGAS_JUDGE_BACKEND` at evaluation
+time, so no code changes are needed.
+
 ## Layout
 
 ```
