@@ -81,16 +81,25 @@ def cmd_build_graph(
 def cmd_synth_eval(
     n: int = typer.Option(30, "--n"),
     out: Path = typer.Option(Path("experiments/eval_set.jsonl"), "--out"),
+    style: str = typer.Option(
+        "simple",
+        "--style",
+        help="simple = factoid only (legacy). mixed = ~50:30:20 factoid:multi_hop:abstract.",
+    ),
 ) -> None:
     """Generate synthetic Q+reference-context pairs from the ingested corpus."""
-    from .evaluation.synth import generate_eval_set
+    from .evaluation.synth import generate_testset
 
-    pairs = generate_eval_set(n=n)
+    pairs = generate_testset(n=n, style=style)
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w") as f:
         for p in pairs:
             f.write(json.dumps(p, ensure_ascii=False) + "\n")
-    console.print(f"[green]wrote[/green] {len(pairs)} eval pairs → {out}")
+    types = {
+        t: sum(1 for p in pairs if p.get("question_type") == t)
+        for t in ("factoid", "multi_hop", "abstract")
+    }
+    console.print(f"[green]wrote[/green] {len(pairs)} eval pairs → {out} types={types}")
 
 
 # ---------- run ----------
@@ -125,11 +134,20 @@ def cmd_compare(
     if not rows:
         console.print("[yellow]no runs found[/yellow]")
         return
-    table = Table("pipeline", "run_id", "n", "faithfulness", "answer_relevancy",
-                  "context_precision", "context_recall")
+    table = Table(
+        "pipeline",
+        "run_id",
+        "n",
+        "faithfulness",
+        "answer_relevancy",
+        "context_precision",
+        "context_recall",
+    )
     for r in rows:
         table.add_row(
-            r["pipeline"], r["run_id"], str(r["n"]),
+            r["pipeline"],
+            r["run_id"],
+            str(r["n"]),
             f"{r.get('faithfulness', float('nan')):.3f}",
             f"{r.get('answer_relevancy', float('nan')):.3f}",
             f"{r.get('context_precision', float('nan')):.3f}",
@@ -155,8 +173,7 @@ def cmd_query(
     console.rule("[bold cyan]Contexts")
     for i, ctx in enumerate(answer.contexts, 1):
         console.print(
-            f"[dim]{i}. score={ctx.score:.3f} doc={ctx.chunk.doc_id} "
-            f"chunk={ctx.chunk.id}[/dim]"
+            f"[dim]{i}. score={ctx.score:.3f} doc={ctx.chunk.doc_id} chunk={ctx.chunk.id}[/dim]"
         )
         console.print(ctx.chunk.text[:300] + ("…" if len(ctx.chunk.text) > 300 else ""))
         console.print()

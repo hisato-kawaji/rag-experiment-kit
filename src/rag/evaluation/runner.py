@@ -19,12 +19,8 @@ def run_pipeline_against_eval(
     skip_eval: bool = False,
 ) -> str:
     if not eval_set.exists():
-        raise FileNotFoundError(
-            f"Eval set not found: {eval_set}. Run `task synth-eval` first."
-        )
-    eval_rows = [
-        json.loads(line) for line in eval_set.read_text().splitlines() if line.strip()
-    ]
+        raise FileNotFoundError(f"Eval set not found: {eval_set}. Run `task synth-eval` first.")
+    eval_rows = [json.loads(line) for line in eval_set.read_text().splitlines() if line.strip()]
     log.info("run.start", pipeline=pipeline.name, n=len(eval_rows))
 
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
@@ -44,6 +40,7 @@ def run_pipeline_against_eval(
         results.append(
             {
                 "question": q,
+                "question_type": row.get("question_type", "factoid"),
                 "ground_truth": row.get("ground_truth", ""),
                 "answer": ans.text,
                 "contexts": [c.chunk.text for c in ans.contexts],
@@ -74,15 +71,36 @@ def run_pipeline_against_eval(
         try:
             scores = evaluate_ragas(results)
             summary.update(scores)
+            # Per question-type breakdown — only emit if the eval set actually
+            # used the mixed-style synth (otherwise everything is "factoid"
+            # and the per-type numbers are identical to the overall numbers).
+            types_present = {r.get("question_type", "factoid") for r in results}
+            if len(types_present) > 1:
+                summary["per_question_type"] = _per_type_metrics(results)
         except Exception as e:
             log.warning("run.eval-error", error=str(e))
             summary["eval_error"] = str(e)
 
-    (run_dir / "summary.json").write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2)
-    )
+    (run_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2))
     log.info("run.done", **{k: v for k, v in summary.items() if k != "ts"})
     return run_id
+
+
+def _per_type_metrics(results: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
+    """Re-run Ragas on each question_type subset. Skips empty groups."""
+    out: dict[str, dict[str, float]] = {}
+    by_type: dict[str, list[dict[str, Any]]] = {}
+    for r in results:
+        by_type.setdefault(r.get("question_type", "factoid"), []).append(r)
+    for qtype, rows in by_type.items():
+        if not rows:
+            continue
+        try:
+            out[qtype] = evaluate_ragas(rows)
+        except Exception as e:
+            log.warning("run.per-type-eval.error", qtype=qtype, error=str(e))
+            out[qtype] = {"error": str(e)}
+    return out
 
 
 def latest_runs_summary(runs_dir: Path) -> list[dict[str, Any]]:
