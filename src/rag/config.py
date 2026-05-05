@@ -39,3 +39,7 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
     openai_api_key: str = ""
+
+    mlflow_enabled: bool = False
+    mlflow_tracking_uri: str = "./mlruns"
+    mlflow_experiment: str = "rag-experiment-kit"

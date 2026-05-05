@@ -47,6 +47,24 @@ One-off query:
 task query -- --pipeline graphrag --q "What are the main approaches to quantum error correction?"
 ```
 
+## Browsing experiments in MLflow
+
+Each `task run` already writes `experiments/runs/<run_id>/{answers.jsonl,
+summary.json}` for `task compare`. Set `MLFLOW_ENABLED=true` and the runner
+also logs params + metrics + artifacts to `./mlruns`, so you can plot
+parameter sweeps and time-series in MLflow's web UI.
+
+```bash
+uv sync --extra mlflow
+echo "MLFLOW_ENABLED=true" >> .env
+task run -- --pipeline baseline
+task run -- --pipeline graphrag
+task mlflow-ui   # http://localhost:5000
+```
+
+Each MLflow run is tagged with the current git commit SHA so you can pin a
+metric regression to a code change.
+
 ## Layout
 
 ```

@@ -6,8 +6,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ..config import Settings
 from ..logging import log
 from ..pipelines import Pipeline
+from ..tracking import build_tracker
 from .ragas_eval import evaluate_ragas
 
 
@@ -19,18 +21,29 @@ def run_pipeline_against_eval(
     skip_eval: bool = False,
 ) -> str:
     if not eval_set.exists():
-        raise FileNotFoundError(
-            f"Eval set not found: {eval_set}. Run `task synth-eval` first."
-        )
-    eval_rows = [
-        json.loads(line) for line in eval_set.read_text().splitlines() if line.strip()
-    ]
+        raise FileNotFoundError(f"Eval set not found: {eval_set}. Run `task synth-eval` first.")
+    eval_rows = [json.loads(line) for line in eval_set.read_text().splitlines() if line.strip()]
     log.info("run.start", pipeline=pipeline.name, n=len(eval_rows))
+    settings = Settings()
+    tracker = build_tracker(settings)
 
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
     run_id = f"{pipeline.name.replace('/', '_')}-{ts}"
     run_dir = out_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
+
+    tracker.start(run_name=run_id)
+    tracker.log_params(
+        {
+            "pipeline": pipeline.name,
+            "top_k": getattr(pipeline, "top_k", None),
+            "eval_set": str(eval_set),
+            "eval_set_size": len(eval_rows),
+            "ollama_model_llm": settings.ollama_model_llm,
+            "ollama_model_embed": settings.ollama_model_embed,
+            "ragas_judge_backend": getattr(settings, "ragas_judge_backend", "ollama"),
+        }
+    )
 
     results: list[dict[str, Any]] = []
     t0 = time.time()
@@ -78,9 +91,21 @@ def run_pipeline_against_eval(
             log.warning("run.eval-error", error=str(e))
             summary["eval_error"] = str(e)
 
-    (run_dir / "summary.json").write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2)
+    (run_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2))
+    tracker.log_metrics(
+        {
+            "elapsed_sec": summary["elapsed_sec"],
+            "n_results": summary["n"],
+            **{
+                k: v
+                for k, v in summary.items()
+                if k in {"faithfulness", "answer_relevancy", "context_precision", "context_recall"}
+            },
+        }
     )
+    tracker.log_artifact(run_dir / "answers.jsonl")
+    tracker.log_artifact(run_dir / "summary.json")
+    tracker.end()
     log.info("run.done", **{k: v for k, v in summary.items() if k != "ts"})
     return run_id
 

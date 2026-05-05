@@ -79,6 +79,11 @@ tasks:
     desc: 'Scaffold a paper folder. e.g. task new-paper -- --id 2410.05229 --name hipporag'
     cmds: ['{{.PY}} -m rag.cli new-paper {{.CLI_ARGS}}']
 
+  mlflow-ui:
+    desc: Browse runs (set MLFLOW_ENABLED=true and re-run `task run` first to populate)
+    cmds:
+      - uv run mlflow ui --backend-store-uri $MLFLOW_TRACKING_URI --port 5000
+
   # ---------- quality ----------
   test:
     cmds: [uv run pytest]
