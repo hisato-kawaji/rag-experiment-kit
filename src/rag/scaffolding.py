@@ -90,9 +90,7 @@ top_k: 5
 ARXIV_PDF_URL = "https://arxiv.org/pdf/{}"
 
 
-def scaffold_paper(
-    arxiv_id: str, name: str, project_root: Path | None = None
-) -> list[Path]:
+def scaffold_paper(arxiv_id: str, name: str, project_root: Path | None = None) -> list[Path]:
     """Create papers/<name>_<id>/ + src/rag/techniques/<name>/ + configs/pipelines/<name>.yaml.
 
     Idempotent — does not overwrite existing files. Returns the list of files created.
@@ -134,9 +132,7 @@ def scaffold_paper(
     pipeline_file = technique_dir / "pipeline.py"
     if not pipeline_file.exists():
         pipeline_file.write_text(
-            TECHNIQUE_PIPELINE_TEMPLATE.format(
-                arxiv_id=arxiv_id, name=name, cls_name=cls_name
-            )
+            TECHNIQUE_PIPELINE_TEMPLATE.format(arxiv_id=arxiv_id, name=name, cls_name=cls_name)
         )
         created.append(pipeline_file)
 
