@@ -65,10 +65,19 @@ class {cls_name}Pipeline:
 
     def __init__(self, *, top_k: int = 5, **_: Any) -> None:
         self.top_k = top_k
-        # TODO: initialize technique-specific resources
+        # TODO[indexing-load]: load artifacts produced by the technique's
+        # build step (graph, tree, index, etc.) from data/{name}/.
 
     def answer(self, query: str) -> Answer:
-        raise NotImplementedError("{name} pipeline not yet implemented")
+        # TODO[query-embed]: turn the question into the form the technique
+        # consumes (embedding, entity-anchor set, etc.).
+        # TODO[query-retrieve]: technique-specific retrieval (graph traversal,
+        # tree descent, PPR, hybrid fusion, ...).
+        # TODO[query-generate]: assemble retrieved context into a prompt and
+        # call the LLM. Return Answer(text=..., contexts=..., metadata=...).
+        raise NotImplementedError(
+            "{name} pipeline not yet implemented — run /implement-paper {name}"
+        )
 '''
 
 PIPELINE_CONFIG_TEMPLATE = """\

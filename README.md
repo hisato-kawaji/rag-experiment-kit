@@ -76,6 +76,20 @@ task new-paper -- --id 2410.05229 --name hipporag
 # scaffolds configs/pipelines/hipporag.yaml
 ```
 
+Then in Claude Code, run the slash command:
+
+```text
+/implement-paper hipporag
+```
+
+`/implement-paper <name>` is defined at `.claude/commands/implement-paper.md`
+and instructs Claude to read the scaffolded `paper.pdf`, mirror
+`src/rag/techniques/graphrag/` as a code-style reference, and fill in
+`prompts.py` / `pipeline.py` (and any technique-specific modules) so that
+`uv run rag query --pipeline <name> --q "test"` no longer raises
+`ImportError`/`AttributeError`. A `NotImplementedError` from inside the
+pipeline is fine at this stage and shows you which substep is left.
+
 ## Phase 2/3 backlog
 
 - Multi vector DB adapters (Weaviate, LanceDB, pgvector)
