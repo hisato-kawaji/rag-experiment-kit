@@ -9,6 +9,7 @@ from ...types import Chunk
 from ...vectorstores import build_vectorstore
 from ...vectorstores.qdrant_store import QdrantStore
 from .community import hierarchical_leiden
+from .entity_index import EntityIndex
 from .extractor import extract_all
 from .graph import build_graph
 from .store import save_artifacts
@@ -71,16 +72,12 @@ def build_graphrag_index(
         chunks = chunks[:max_chunks]
     log.info("graphrag.build.chunks", n=len(chunks))
     if not chunks:
-        raise RuntimeError(
-            "No chunks in vector store. Run `task ingest -- ...` first."
-        )
+        raise RuntimeError("No chunks in vector store. Run `task ingest -- ...` first.")
 
     llm = build_llm()
     entities, relations = extract_all(chunks, llm=llm, workers=extraction_workers)
     g = build_graph(entities, relations)
-    log.info(
-        "graphrag.build.graph", nodes=g.number_of_nodes(), edges=g.number_of_edges()
-    )
+    log.info("graphrag.build.graph", nodes=g.number_of_nodes(), edges=g.number_of_edges())
     if g.number_of_nodes() == 0:
         raise RuntimeError("Extraction produced no entities.")
 
@@ -89,6 +86,9 @@ def build_graphrag_index(
 
     reports = summarize_communities(g, communities, llm=llm, workers=summary_workers)
     save_artifacts(out_dir, graph=g, communities=communities, reports=reports)
+
+    entity_index = EntityIndex.build(g)
+    entity_index.save(out_dir)
     log.info("graphrag.build.saved", out_dir=str(out_dir))
 
     return BuildResult(

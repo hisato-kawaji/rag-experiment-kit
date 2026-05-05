@@ -8,6 +8,7 @@ from ...llm import LLM, build_llm
 from ...logging import log
 from ...types import Answer, Chunk, RetrievedChunk
 from ...vectorstores import build_vectorstore
+from .entity_index import EntityIndex
 from .extractor import _safe_parse_json
 from .prompts import GLOBAL_MAP_PROMPT, GLOBAL_REDUCE_PROMPT, LOCAL_PROMPT
 from .store import load_artifacts
@@ -22,6 +23,13 @@ class GraphRAGRetriever:
         # Prefer level 1 if present (smaller, more focused communities)
         levels = {r.level for r in self.reports}
         self.preferred_level = 1 if 1 in levels else (max(levels) if levels else 0)
+        self._embedder = build_embedding()
+        self._entity_index = EntityIndex.load(artifacts_dir)
+        if self._entity_index is None:
+            log.warning(
+                "graphrag.entity_index.missing",
+                hint="Rebuild graph with `task build-graph` to enable similarity-based local anchoring.",
+            )
 
     # ---------- global (map-reduce over community summaries) ----------
     def global_search(
@@ -46,9 +54,7 @@ class GraphRAGRetriever:
                     if h > 0 and ans:
                         partials.append((h, r, ans))
                 except Exception as e:
-                    log.warning(
-                        "graphrag.global.map-error", cid=r.community_id, error=str(e)
-                    )
+                    log.warning("graphrag.global.map-error", cid=r.community_id, error=str(e))
 
         partials.sort(key=lambda t: -t[0])
         top = partials[:top_n_for_reduce]
@@ -92,9 +98,8 @@ class GraphRAGRetriever:
         )
 
     def _map_one(self, report: CommunityReport, question: str) -> tuple[int, str]:
-        report_block = (
-            f"# {report.title}\n\n{report.summary}\n\n"
-            "## Findings\n" + "\n".join(f"- {f}" for f in report.findings)
+        report_block = f"# {report.title}\n\n{report.summary}\n\n## Findings\n" + "\n".join(
+            f"- {f}" for f in report.findings
         )
         raw = self.llm.complete(
             GLOBAL_MAP_PROMPT.format(report=report_block, question=question),
@@ -126,11 +131,14 @@ class GraphRAGRetriever:
         neighborhood = self._expand_neighborhood(anchors, n_neighborhood)
         chunks = self._supporting_chunks(question, anchors | neighborhood, top_chunks)
 
-        entities_block = "\n".join(
-            f"- {e} ({self.graph.nodes[e].get('type', 'OTHER')})"
-            for e in anchors
-            if e in self.graph
-        ) or "(none — falling back to similarity-only retrieval)"
+        entities_block = (
+            "\n".join(
+                f"- {e} ({self.graph.nodes[e].get('type', 'OTHER')})"
+                for e in anchors
+                if e in self.graph
+            )
+            or "(none — falling back to similarity-only retrieval)"
+        )
 
         nb_lines: list[str] = []
         for u in anchors:
@@ -145,9 +153,7 @@ class GraphRAGRetriever:
             if len(nb_lines) >= n_neighborhood:
                 break
         neighborhood_block = "\n".join(nb_lines) or "(none)"
-        chunks_block = (
-            "\n\n".join(f"[{c.chunk.doc_id}] {c.chunk.text}" for c in chunks) or "(none)"
-        )
+        chunks_block = "\n\n".join(f"[{c.chunk.doc_id}] {c.chunk.text}" for c in chunks) or "(none)"
 
         prompt = LOCAL_PROMPT.format(
             entities=entities_block,
@@ -168,11 +174,24 @@ class GraphRAGRetriever:
         )
 
     # ---------- helpers ----------
-    def _anchor_entities(self, question: str, k: int) -> set[str]:
-        """Heuristic: lowercased substring/token match of entity names against the question.
+    def _anchor_entities(self, question: str, k: int, *, min_score: float = 0.3) -> set[str]:
+        """Embed the question, top-k cosine match against the entity vector index.
 
-        Phase 2 will replace this with a dedicated entity-vector index for robust matching.
+        Falls back to substring/token heuristic when the index is missing
+        (artifacts predate this feature) or when no entity passes `min_score`.
         """
+        if self._entity_index is not None:
+            qv = self._embedder.embed([question])[0]
+            hits = self._entity_index.search(qv, k=k, min_score=min_score)
+            if hits:
+                log.info(
+                    "graphrag.local.anchors",
+                    anchors=[(n, round(s, 3)) for n, s in hits],
+                )
+                return {n for n, _ in hits if n in self.graph}
+        return self._anchor_by_substring(question, k)
+
+    def _anchor_by_substring(self, question: str, k: int) -> set[str]:
         q = question.lower()
         scored: list[tuple[int, str]] = []
         for n in self.graph.nodes:
@@ -201,9 +220,7 @@ class GraphRAGRetriever:
                     return out
         return out
 
-    def _supporting_chunks(
-        self, question: str, ents: set[str], k: int
-    ) -> list[RetrievedChunk]:
+    def _supporting_chunks(self, question: str, ents: set[str], k: int) -> list[RetrievedChunk]:
         embedding = build_embedding()
         vs = build_vectorstore()
         qv = embedding.embed([question])[0]

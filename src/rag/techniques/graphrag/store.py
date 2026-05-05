@@ -13,6 +13,7 @@ from .summarizer import CommunityReport
 GRAPH_FILE = "graph.pickle"
 COMMUNITIES_FILE = "communities.json"
 REPORTS_FILE = "reports.json"
+ENTITY_INDEX_FILE = "entity_index.pickle"
 
 
 def save_artifacts(

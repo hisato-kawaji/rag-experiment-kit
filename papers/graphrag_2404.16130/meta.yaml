@@ -28,11 +28,12 @@ key_ideas:
 
 phase1_simplifications:
   - "Single-pass entity extraction (no 'gleaning' multi-pass loop yet)."
-  - "Local-search entity matching uses substring/token heuristic, not a dedicated entity vector index."
   - "Community ranking uses LLM self-rated helpfulness (0-100), not a separately trained scorer."
+
+phase2_completed:
+  - "Entity vector index for local-search anchoring (EntityIndex). build_graphrag_index now embeds each entity's name + first description and persists `entity_index.pickle` next to the graph artifact. The retriever's _anchor_entities falls back to the old substring heuristic only when the index is missing or all matches drop below the cosine threshold (default 0.3)."
 
 phase2_followups:
   - "Add gleaning loop for higher extraction recall."
-  - "Build a dedicated entity vector index (separate Qdrant collection) for robust local-search anchoring."
   - "Persist graph to Neo4j for browser-based exploration."
   - "Per-level community evaluation — measure when global vs local is preferable."
