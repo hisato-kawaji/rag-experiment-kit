@@ -32,6 +32,14 @@ def cmd_ingest(
     chunk_size: int = typer.Option(800),
     chunk_overlap: int = typer.Option(100),
     reset: bool = typer.Option(False, "--reset", help="Drop collection first"),
+    related_only: bool = typer.Option(
+        False,
+        "--related-only",
+        help="(wikipedia) drop link targets whose summary cosine-sim to seed < --threshold",
+    ),
+    threshold: float = typer.Option(
+        0.4, "--threshold", help="(wikipedia) cosine-sim cutoff for --related-only"
+    ),
 ) -> None:
     """Pull docs → chunk → embed → upsert into Qdrant."""
     from .data import ingest as _ingest
@@ -51,7 +59,14 @@ def cmd_ingest(
     else:
         raise typer.BadParameter(f"Unknown source: {source}")
 
-    stats = _ingest(source, kwargs, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    stats = _ingest(
+        source,
+        kwargs,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        related_only=related_only,
+        relevance_threshold=threshold,
+    )
     console.print(f"[green]ingested[/green] docs={stats.docs} chunks={stats.chunks}")
 
 
@@ -61,6 +76,11 @@ def cmd_build_graph(
     out_dir: Path = typer.Option(Path("data/graphrag"), "--out"),
     max_chunks: int = typer.Option(0, "--max-chunks", help="0 = use all"),
     leiden_max_levels: int = typer.Option(3, "--levels"),
+    gleaning_passes: int = typer.Option(
+        1,
+        "--gleaning-passes",
+        help="GraphRAG §2.2 gleaning loop passes. 1 = single-pass (default)",
+    ),
 ) -> None:
     """Build the GraphRAG index from chunks already in the vector store."""
     from .techniques.graphrag.build import build_graphrag_index
@@ -69,6 +89,7 @@ def cmd_build_graph(
         out_dir=out_dir,
         max_chunks=max_chunks or None,
         leiden_max_levels=leiden_max_levels,
+        gleaning_passes=gleaning_passes,
     )
     console.print(
         f"[green]graph built[/green] entities={out.n_entities} "
@@ -125,11 +146,20 @@ def cmd_compare(
     if not rows:
         console.print("[yellow]no runs found[/yellow]")
         return
-    table = Table("pipeline", "run_id", "n", "faithfulness", "answer_relevancy",
-                  "context_precision", "context_recall")
+    table = Table(
+        "pipeline",
+        "run_id",
+        "n",
+        "faithfulness",
+        "answer_relevancy",
+        "context_precision",
+        "context_recall",
+    )
     for r in rows:
         table.add_row(
-            r["pipeline"], r["run_id"], str(r["n"]),
+            r["pipeline"],
+            r["run_id"],
+            str(r["n"]),
             f"{r.get('faithfulness', float('nan')):.3f}",
             f"{r.get('answer_relevancy', float('nan')):.3f}",
             f"{r.get('context_precision', float('nan')):.3f}",
@@ -155,8 +185,7 @@ def cmd_query(
     console.rule("[bold cyan]Contexts")
     for i, ctx in enumerate(answer.contexts, 1):
         console.print(
-            f"[dim]{i}. score={ctx.score:.3f} doc={ctx.chunk.doc_id} "
-            f"chunk={ctx.chunk.id}[/dim]"
+            f"[dim]{i}. score={ctx.score:.3f} doc={ctx.chunk.doc_id} chunk={ctx.chunk.id}[/dim]"
         )
         console.print(ctx.chunk.text[:300] + ("…" if len(ctx.chunk.text) > 300 else ""))
         console.print()

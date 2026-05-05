@@ -30,6 +30,31 @@ Text:
 \"\"\"
 """
 
+GLEANING_PROMPT = """You previously extracted entities and relationships from a text. Inspect the SAME text again and report ONLY items that were MISSED.
+
+Already-extracted entities (do NOT repeat these):
+{prior_entities}
+
+Already-extracted relationships (do NOT repeat these):
+{prior_relationships}
+
+Text:
+\"\"\"
+{text}
+\"\"\"
+
+Rules:
+- Output a NEW entity only if it is mentioned in the text and not in the list above.
+- Output a NEW relationship only if both endpoints appear in the text and the pair (or its description) is not in the list above.
+- If nothing was missed, return empty arrays.
+
+Schema (no commentary, no markdown fences):
+{{
+  "entities": [{{"name": "...", "type": "...", "description": "..."}}],
+  "relationships": [{{"source": "...", "target": "...", "description": "...", "weight": 5}}]
+}}
+"""
+
 COMMUNITY_SUMMARY_PROMPT = """You are an analyst writing a report on a knowledge-graph community.
 
 Entities in this community:

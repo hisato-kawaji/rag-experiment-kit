@@ -10,10 +10,10 @@ SOURCES: dict[str, type] = {
 }
 
 
-def build_source(name: str, **kwargs: object) -> Source:
+def build_source(name: str, **init_kwargs: object) -> Source:
     if name not in SOURCES:
         raise ValueError(f"Unknown source: {name!r}. Known: {sorted(SOURCES)}")
-    return SOURCES[name](**kwargs)
+    return SOURCES[name](**init_kwargs)
 
 
 __all__ = ["SOURCES", "Source", "WebSource", "WikipediaSource", "build_source"]

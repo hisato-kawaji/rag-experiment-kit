@@ -59,6 +59,7 @@ def build_graphrag_index(
     leiden_max_levels: int = 3,
     extraction_workers: int = 4,
     summary_workers: int = 4,
+    gleaning_passes: int = 1,
 ) -> BuildResult:
     vs = build_vectorstore()
     if not isinstance(vs, QdrantStore):
@@ -71,16 +72,17 @@ def build_graphrag_index(
         chunks = chunks[:max_chunks]
     log.info("graphrag.build.chunks", n=len(chunks))
     if not chunks:
-        raise RuntimeError(
-            "No chunks in vector store. Run `task ingest -- ...` first."
-        )
+        raise RuntimeError("No chunks in vector store. Run `task ingest -- ...` first.")
 
     llm = build_llm()
-    entities, relations = extract_all(chunks, llm=llm, workers=extraction_workers)
-    g = build_graph(entities, relations)
-    log.info(
-        "graphrag.build.graph", nodes=g.number_of_nodes(), edges=g.number_of_edges()
+    entities, relations = extract_all(
+        chunks,
+        llm=llm,
+        workers=extraction_workers,
+        gleaning_passes=gleaning_passes,
     )
+    g = build_graph(entities, relations)
+    log.info("graphrag.build.graph", nodes=g.number_of_nodes(), edges=g.number_of_edges())
     if g.number_of_nodes() == 0:
         raise RuntimeError("Extraction produced no entities.")
 

@@ -33,9 +33,18 @@ def ingest(
     chunk_overlap: int = 100,
     embed_batch: int = 32,
     upsert_batch: int = 128,
+    related_only: bool = False,
+    relevance_threshold: float = 0.4,
 ) -> IngestStats:
-    src = build_source(source)
     embedder = build_embedding()
+    init_kwargs: dict[str, Any] = {}
+    if source == "wikipedia" and related_only:
+        init_kwargs = {
+            "related_only": True,
+            "relevance_threshold": relevance_threshold,
+            "embedding": embedder,
+        }
+    src = build_source(source, **init_kwargs)
     vectorstore = build_vectorstore()
     vectorstore.ensure_collection(embedder.dim)
 

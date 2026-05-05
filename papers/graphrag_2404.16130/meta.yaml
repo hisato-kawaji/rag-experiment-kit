@@ -27,12 +27,13 @@ key_ideas:
   - "Local query = entity-anchored neighborhood + supporting chunks (good for factoid questions)."
 
 phase1_simplifications:
-  - "Single-pass entity extraction (no 'gleaning' multi-pass loop yet)."
   - "Local-search entity matching uses substring/token heuristic, not a dedicated entity vector index."
   - "Community ranking uses LLM self-rated helpfulness (0-100), not a separately trained scorer."
 
+phase2_completed:
+  - "Gleaning loop (§2.2): extract_with_gleaning runs the extractor up to N passes per chunk, prompting the LLM to surface only entities/relations it missed previously. Enabled via `--gleaning-passes` on `task build-graph`."
+
 phase2_followups:
-  - "Add gleaning loop for higher extraction recall."
   - "Build a dedicated entity vector index (separate Qdrant collection) for robust local-search anchoring."
   - "Persist graph to Neo4j for browser-based exploration."
   - "Per-level community evaluation — measure when global vs local is preferable."
