@@ -6,6 +6,7 @@ from pathlib import Path
 from ...embedding import build_embedding
 from ...llm import LLM, build_llm
 from ...logging import log
+from ...tracing import traced_span
 from ...types import Answer, Chunk, RetrievedChunk
 from ...vectorstores import build_vectorstore
 from .extractor import _safe_parse_json
@@ -37,7 +38,15 @@ class GraphRAGRetriever:
         log.info("graphrag.global.map", n=len(candidates), level=chosen_level)
 
         partials: list[tuple[int, CommunityReport, str]] = []
-        with ThreadPoolExecutor(max_workers=map_workers) as ex:
+        with (
+            traced_span(
+                "graphrag.global.map",
+                level=chosen_level,
+                n_candidates=len(candidates),
+                workers=map_workers,
+            ),
+            ThreadPoolExecutor(max_workers=map_workers) as ex,
+        ):
             futures = {ex.submit(self._map_one, r, question): r for r in candidates}
             for fut in as_completed(futures):
                 r = futures[fut]
@@ -46,9 +55,7 @@ class GraphRAGRetriever:
                     if h > 0 and ans:
                         partials.append((h, r, ans))
                 except Exception as e:
-                    log.warning(
-                        "graphrag.global.map-error", cid=r.community_id, error=str(e)
-                    )
+                    log.warning("graphrag.global.map-error", cid=r.community_id, error=str(e))
 
         partials.sort(key=lambda t: -t[0])
         top = partials[:top_n_for_reduce]
@@ -92,16 +99,20 @@ class GraphRAGRetriever:
         )
 
     def _map_one(self, report: CommunityReport, question: str) -> tuple[int, str]:
-        report_block = (
-            f"# {report.title}\n\n{report.summary}\n\n"
-            "## Findings\n" + "\n".join(f"- {f}" for f in report.findings)
+        report_block = f"# {report.title}\n\n{report.summary}\n\n## Findings\n" + "\n".join(
+            f"- {f}" for f in report.findings
         )
-        raw = self.llm.complete(
-            GLOBAL_MAP_PROMPT.format(report=report_block, question=question),
-            json_mode=True,
-            temperature=0.0,
-            max_tokens=512,
-        )
+        with traced_span(
+            "graphrag.global.map_one",
+            community_id=report.community_id,
+            level=report.level,
+        ):
+            raw = self.llm.complete(
+                GLOBAL_MAP_PROMPT.format(report=report_block, question=question),
+                json_mode=True,
+                temperature=0.0,
+                max_tokens=512,
+            )
         data = _safe_parse_json(raw)
         if not data:
             return 0, ""
@@ -126,11 +137,14 @@ class GraphRAGRetriever:
         neighborhood = self._expand_neighborhood(anchors, n_neighborhood)
         chunks = self._supporting_chunks(question, anchors | neighborhood, top_chunks)
 
-        entities_block = "\n".join(
-            f"- {e} ({self.graph.nodes[e].get('type', 'OTHER')})"
-            for e in anchors
-            if e in self.graph
-        ) or "(none — falling back to similarity-only retrieval)"
+        entities_block = (
+            "\n".join(
+                f"- {e} ({self.graph.nodes[e].get('type', 'OTHER')})"
+                for e in anchors
+                if e in self.graph
+            )
+            or "(none — falling back to similarity-only retrieval)"
+        )
 
         nb_lines: list[str] = []
         for u in anchors:
@@ -145,9 +159,7 @@ class GraphRAGRetriever:
             if len(nb_lines) >= n_neighborhood:
                 break
         neighborhood_block = "\n".join(nb_lines) or "(none)"
-        chunks_block = (
-            "\n\n".join(f"[{c.chunk.doc_id}] {c.chunk.text}" for c in chunks) or "(none)"
-        )
+        chunks_block = "\n\n".join(f"[{c.chunk.doc_id}] {c.chunk.text}" for c in chunks) or "(none)"
 
         prompt = LOCAL_PROMPT.format(
             entities=entities_block,
@@ -201,9 +213,7 @@ class GraphRAGRetriever:
                     return out
         return out
 
-    def _supporting_chunks(
-        self, question: str, ents: set[str], k: int
-    ) -> list[RetrievedChunk]:
+    def _supporting_chunks(self, question: str, ents: set[str], k: int) -> list[RetrievedChunk]:
         embedding = build_embedding()
         vs = build_vectorstore()
         qv = embedding.embed([question])[0]

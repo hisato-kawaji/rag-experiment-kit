@@ -4,6 +4,8 @@ from typing import Any
 
 import ollama
 
+from ..tracing import traced_span
+
 
 class OllamaLLM:
     def __init__(self, model: str, host: str = "http://localhost:11434") -> None:
@@ -41,7 +43,16 @@ class OllamaLLM:
         **kwargs: Any,
     ) -> str:
         messages, options, fmt = self._build(prompt, system, temperature, max_tokens, json_mode)
-        resp = self._client.chat(model=self.model, messages=messages, options=options, format=fmt)
+        with traced_span(
+            "ollama.complete",
+            model=self.model,
+            prompt_chars=len(prompt),
+            json_mode=json_mode,
+            max_tokens=max_tokens or -1,
+        ):
+            resp = self._client.chat(
+                model=self.model, messages=messages, options=options, format=fmt
+            )
         return resp["message"]["content"]
 
     async def acomplete(

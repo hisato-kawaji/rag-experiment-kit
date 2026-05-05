@@ -12,6 +12,7 @@ from rich.table import Table
 
 from .config import Settings
 from .logging import log, setup_logging
+from .tracing import setup_tracing
 
 app = typer.Typer(no_args_is_help=True, add_completion=False, pretty_exceptions_show_locals=False)
 console = Console()
@@ -20,6 +21,7 @@ console = Console()
 @app.callback()
 def _root(verbose: bool = typer.Option(False, "-v", "--verbose")) -> None:
     setup_logging("DEBUG" if verbose else "INFO")
+    setup_tracing()
 
 
 # ---------- ingest ----------
@@ -125,11 +127,20 @@ def cmd_compare(
     if not rows:
         console.print("[yellow]no runs found[/yellow]")
         return
-    table = Table("pipeline", "run_id", "n", "faithfulness", "answer_relevancy",
-                  "context_precision", "context_recall")
+    table = Table(
+        "pipeline",
+        "run_id",
+        "n",
+        "faithfulness",
+        "answer_relevancy",
+        "context_precision",
+        "context_recall",
+    )
     for r in rows:
         table.add_row(
-            r["pipeline"], r["run_id"], str(r["n"]),
+            r["pipeline"],
+            r["run_id"],
+            str(r["n"]),
             f"{r.get('faithfulness', float('nan')):.3f}",
             f"{r.get('answer_relevancy', float('nan')):.3f}",
             f"{r.get('context_precision', float('nan')):.3f}",
@@ -155,8 +166,7 @@ def cmd_query(
     console.rule("[bold cyan]Contexts")
     for i, ctx in enumerate(answer.contexts, 1):
         console.print(
-            f"[dim]{i}. score={ctx.score:.3f} doc={ctx.chunk.doc_id} "
-            f"chunk={ctx.chunk.id}[/dim]"
+            f"[dim]{i}. score={ctx.score:.3f} doc={ctx.chunk.doc_id} chunk={ctx.chunk.id}[/dim]"
         )
         console.print(ctx.chunk.text[:300] + ("…" if len(ctx.chunk.text) > 300 else ""))
         console.print()

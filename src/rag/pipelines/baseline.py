@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ..embedding import Embedding, build_embedding
 from ..llm import LLM, build_llm
+from ..tracing import traced_span
 from ..types import Answer, RetrievedChunk
 from ..vectorstores import VectorStore, build_vectorstore
 
@@ -40,14 +41,13 @@ class BaselineRAG:
         return self.vectorstore.search(qv, k=self.top_k)
 
     def answer(self, query: str) -> Answer:
-        contexts = self.retrieve(query)
-        context_block = "\n\n".join(
-            f"[{c.chunk.doc_id}] {c.chunk.text}" for c in contexts
-        )
-        prompt = ANSWER_PROMPT.format(context=context_block, question=query)
-        text = self.llm.complete(prompt, temperature=0.0, max_tokens=512)
-        return Answer(
-            text=text,
-            contexts=contexts,
-            metadata={"pipeline": self.name, "top_k": self.top_k, "llm": self.llm.name},
-        )
+        with traced_span("baseline.answer", top_k=self.top_k, query_chars=len(query)):
+            contexts = self.retrieve(query)
+            context_block = "\n\n".join(f"[{c.chunk.doc_id}] {c.chunk.text}" for c in contexts)
+            prompt = ANSWER_PROMPT.format(context=context_block, question=query)
+            text = self.llm.complete(prompt, temperature=0.0, max_tokens=512)
+            return Answer(
+                text=text,
+                contexts=contexts,
+                metadata={"pipeline": self.name, "top_k": self.top_k, "llm": self.llm.name},
+            )

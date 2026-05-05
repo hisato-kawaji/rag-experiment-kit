@@ -79,6 +79,14 @@ tasks:
     desc: 'Scaffold a paper folder. e.g. task new-paper -- --id 2410.05229 --name hipporag'
     cmds: ['{{.PY}} -m rag.cli new-paper {{.CLI_ARGS}}']
 
+  trace-up:
+    desc: Start Phoenix (OTel collector + UI on :6006)
+    cmds: [docker compose --profile trace up -d phoenix]
+
+  trace-ui:
+    desc: Open the Phoenix UI in a browser
+    cmds: [open $PHOENIX_ENDPOINT]
+
   # ---------- quality ----------
   test:
     cmds: [uv run pytest]

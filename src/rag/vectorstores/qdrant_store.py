@@ -6,6 +6,7 @@ from typing import Any
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qm
 
+from ..tracing import traced_span
 from ..types import Chunk, RetrievedChunk
 
 
@@ -55,13 +56,19 @@ class QdrantStore:
         where: dict[str, Any] | None = None,
     ) -> list[RetrievedChunk]:
         flt = self._make_filter(where) if where else None
-        response = self._client.query_points(
-            collection_name=self.collection,
-            query=vector,
-            limit=k,
-            query_filter=flt,
-            with_payload=True,
-        )
+        with traced_span(
+            "qdrant.search",
+            collection=self.collection,
+            k=k,
+            has_filter=flt is not None,
+        ):
+            response = self._client.query_points(
+                collection_name=self.collection,
+                query=vector,
+                limit=k,
+                query_filter=flt,
+                with_payload=True,
+            )
         out: list[RetrievedChunk] = []
         for h in response.points:
             payload = dict(h.payload or {})
@@ -106,7 +113,5 @@ class QdrantStore:
 
     @staticmethod
     def _make_filter(where: dict[str, Any]) -> qm.Filter:
-        must = [
-            qm.FieldCondition(key=k, match=qm.MatchValue(value=v)) for k, v in where.items()
-        ]
+        must = [qm.FieldCondition(key=k, match=qm.MatchValue(value=v)) for k, v in where.items()]
         return qm.Filter(must=must)
