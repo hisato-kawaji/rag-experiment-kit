@@ -31,7 +31,7 @@ class MLflowTracker:
     """
 
     def __init__(self, *, tracking_uri: str, experiment: str = "rag-experiment-kit") -> None:
-        import mlflow  # noqa: PLC0415 — deferred so non-MLflow runs don't pay this
+        import mlflow
 
         self._mlflow = mlflow
         mlflow.set_tracking_uri(tracking_uri)
